@@ -130,7 +130,7 @@ def popup_selecionar_materia():
         st.session_state.pagina = "editor"
         st.rerun()
 
-# --- BARRA LATERAL (CENTRAL DE CONFIGURAÇÕES COESAS) ---
+# --- BARRA LATERAL (CENTRAL DE CONFIGURAÇÕES) ---
 with st.sidebar:
     st.header("⚙️ Configurações")
     
@@ -155,18 +155,32 @@ with st.sidebar:
             
     st.markdown("---")
     
-    # 2. Seção: Gerenciar Notas (Nova aba unificada ao lado)
+    # 2. Seção: Gerenciar Notas (Com filtro de busca integrado)
     st.write("**Gerenciar Notas**")
     notas_painel = carregar_notas()
     if notas_painel:
-        # Monta uma lista legível identificando a nota pelo Eixo + Título
-        opcoes_remover_notas = [f"{n.get('eixo', 'Clínica')} | {n['titulo']}" for n in notas_painel]
+        # Nova barra de busca interna para exclusão
+        busca_gerenciar = st.text_input("🔍 Filtrar nota para exclusão", key="busca_gerenciar_nota")
+        
+        opcoes_remover_notas = []
+        mapeamento_indices = {} # Mapeia a string exibida de volta para o índice real do arquivo json
+        
+        for idx_real, n in enumerate(notas_painel):
+            eixo_n = n.get('eixo', 'Clínica')
+            sub_n = f" | {n.get('subeixo')}" if n.get('subeixo') else ""
+            label_nota = f"{eixo_n}{sub_n} - {n['titulo']}"
+            
+            # Filtra se o usuário digitou algo na busca (olha no título, eixo ou conteúdo interno)
+            termo_busca = busca_gerenciar.lower()
+            if not busca_gerenciar or (termo_busca in label_nota.lower() or termo_busca in n['conteudo'].lower()):
+                opcoes_remover_notas.append(label_nota)
+                mapeamento_indices[label_nota] = idx_real
+        
         nota_alvo_remover = st.selectbox("Selecionar nota para excluir", [""] + opcoes_remover_notas, key="config_remover_nota")
         
         if st.button("Excluir Nota", key="btn_rem_nota_sidebar", use_container_width=True):
-            if nota_alvo_remover:
-                # Descobre o índice correto com base na seleção
-                idx_remover = opcoes_remover_notas.index(nota_alvo_remover)
+            if nota_alvo_remover and nota_alvo_remover in mapeamento_indices:
+                idx_remover = mapeamento_indices[nota_alvo_remover]
                 notas_painel.pop(idx_remover)
                 with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
                     json.dump(notas_painel, f, ensure_ascii=False, indent=4)
@@ -191,7 +205,7 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Filtros
+    # Filtros da Galeria Principal
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar", key="busca_principal")
@@ -290,7 +304,6 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
     
-    # Apenas duas colunas limpas na parte inferior (Salvar e Cancelar)
     col_salvar, col_cancelar = st.columns(2)
     
     with col_salvar:
