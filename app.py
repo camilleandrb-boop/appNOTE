@@ -29,7 +29,7 @@ if "eixo_selecionado" not in st.session_state:
 if "subeixo_selecionado" not in st.session_state:
     st.session_state.subeixo_selecionado = ""
 
-# --- FUNÇÕES DE PERSISTÊNCIA COM TRATAMENTO DE ERROS ---
+# --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
     if os.path.exists(ARQUIVO_NOTAS):
         try:
@@ -114,14 +114,13 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Barra de busca e filtros dinâmicos unificados
+    # Barra de busca e filtros dinâmicos
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar", key="busca_principal")
     with col2:
         filtro_eixo = st.selectbox("📁 Eixo", ["Todos"] + EIXOS_FIXOS, key="filtro_eixo_main")
     with col3:
-        # Configura as opções e o estado do subeixo dinamicamente para evitar ID duplicado
         if filtro_eixo != "Todos":
             opcoes_filtro_sub = ["Todos"] + subeixos_db[filtro_eixo]
             sub_disabled = False
@@ -155,38 +154,33 @@ if st.session_state.pagina == "home":
         else:
             st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
-            # --- SISTEMA DE GALERIA (GRID) ---
+            # --- SISTEMA DE GALERIA EM GRID NATIVO (100% SEGURO) ---
             num_colunas = 2
             cols = st.columns(num_colunas)
             
             for idx, nota in enumerate(reversed(notas_filtradas)):
                 eixo_display = nota.get('eixo', nota.get('materia', 'Clínica'))
                 sub_display = f" | {nota.get('subeixo')}" if nota.get('subeixo') else ""
-                
                 cor_tag = CORES_EIXOS.get(eixo_display, "#718096")
                 
-                card_html = f"""
-                <div style="
-                    background-color: #FFFFFF;
-                    padding: 20px;
-                    border-radius: 14px;
-                    margin-bottom: 16px;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.04);
-                    border: 1px solid #E2E8F0;
-                ">
-                    <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; color: #1A202C;">
-                        {nota['titulo']}
-                    </div>
-                    
-                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #4A5568; margin-bottom: 18px;">
-                        {nota['conteudo']}
-                    </div>
-                    
-                    <div style="margin-top: auto;">
+                with cols[idx % num_colunas]:
+                    # Criamos o quadrado arredondado branco nativo do Streamlit
+                    with st.container(border=True):
+                        # Título limpo
+                        st.markdown(f"### {nota['titulo']}")
+                        
+                        # Texto puro da nota (sem risco de quebrar ou virar código)
+                        st.write(nota['conteudo'])
+                        
+                        # Espaçador
+                        st.write("")
+                        
+                        # Apenas a etiqueta final usa HTML controlado e isolado
+                        tag_html = f"""
                         <span style="
                             background-color: {cor_tag};
                             color: #FFFFFF;
-                            padding: 5px 12px;
+                            padding: 6px 14px;
                             border-radius: 8px;
                             font-size: 0.75rem;
                             font-weight: 700;
@@ -196,12 +190,17 @@ if st.session_state.pagina == "home":
                         ">
                             {eixo_display}{sub_display}
                         </span>
-                    </div>
-                </div>
-                """
-                
-                with cols[idx % num_colunas]:
-                    st.markdown(card_html, unsafe_allow_html=True)
+                        """
+                        st.markdown(tag_html, unsafe_allow_html=True)
+                        
+                        # Botão discreto para apagar notas corrompidas antigas
+                        st.markdown("---")
+                        if st.button("🗑️ Excluir Nota", key=f"del_nota_{idx}"):
+                            if nota in notas_salvas:
+                                notas_salvas.remove(nota)
+                                with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
+                                    json.dump(notas_salvas, f, ensure_ascii=False, indent=4)
+                                st.rerun()
 
 elif st.session_state.pagina == "editor":
     # --- TELA CHEIA DE EDIÇÃO ---
