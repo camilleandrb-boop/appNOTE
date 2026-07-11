@@ -20,6 +20,17 @@ CORES_EIXOS = {
     "Cirurgia": "#E65100"                     # Laranja
 }
 
+# Mapeamento dos comandos para fundos clarinhos (tons pastel confortáveis para leitura)
+MAPA_MARKERS = {
+    "AMA": "#FFF59D",  # Amarelo claro
+    "VED": "#C8E6C9",  # Verde claro
+    "AZU": "#BBDEFB",  # Azul claro
+    "ROS": "#F8BBD0",  # Rosa claro
+    "ROX": "#E1BEE7",  # Roxo claro
+    "VEM": "#FFCDD2",  # Vermelho claro
+    "LAR": "#FFE0B2"   # Laranja claro
+}
+
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
 st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide")
 
@@ -58,10 +69,8 @@ if "nota_index" not in st.session_state:
     st.session_state.nota_index = None
 if "nota_visualizar" not in st.session_state:
     st.session_state.nota_visualizar = None
-if "nota_visualizar_index" not in st.session_state:
-    st.session_state.nota_visualizar_index = None
 
-# --- MOTOR DE FORMATAÇÃO TEXTUAL LIMPO ---
+# --- MOTOR DE FORMATAÇÃO E TRADUÇÃO DE MARCA-TEXTO ---
 def formatar_texto_customizado(texto):
     if not texto:
         return ""
@@ -78,13 +87,25 @@ def formatar_texto_customizado(texto):
             linhas_formatadas.append(f"<blockquote style='border-left: 4px solid #CBD5E0; padding-left: 12px; color: #4A5568; font-style: italic; margin: 8px 0; background-color: #F7FAFC; padding-top: 6px; padding-bottom: 6px;'>{conteudo}</blockquote>")
         
         else:
-            # 2. Negrito (*)
+            # 2. Compilador de Marca-Texto Customizado: (texto)/COR
+            # Procura por padrões como (exame)/AMA ou (conduta)/VED (case-insensitive)
+            padrao_marca_texto = r'\((.*?)\)/(AMA|VED|AZU|ROS|ROX|VEM|LAR)'
+            
+            def substituir_marca(match):
+                conteudo_grifado = match.group(1)
+                codigo_cor = match.group(2).upper()
+                cor_fundo_hex = MAPA_MARKERS.get(codigo_cor, "#FFF59D")
+                return f"<mark style='background-color: {cor_fundo_hex}; color: #000000; padding: 2px 4px; border-radius: 4px;'>{conteudo_grifado}</mark>"
+            
+            linha = re.sub(padrao_marca_texto, substituir_marca, linha, flags=re.IGNORECASE)
+            
+            # 3. Negrito (*)
             linha = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', linha)
             
-            # 3. Itálico (_)
+            # 4. Itálico (_)
             linha = re.sub(r'_(.*?)_', r'<em>\1</em>', linha)
             
-            # 4. Sublinhado (=)
+            # 5. Sublinhado (=)
             linha = re.sub(r'=(.*?)=', r'<u>\1</u>', linha)
             
             if not linha_clean:
@@ -138,7 +159,7 @@ def popup_selecionar_materia():
     subeixo_escolhido = st.selectbox("Subeixo (Opcional)", opcoes_subeixo, key="popup_subeixo")
     
     if st.button("Continuar para o editor ➡️", use_container_width=True, key="btn_continuar"):
-        st.session_state.eixo_selecionado = axis = eixo_escolhido
+        st.session_state.eixo_selecionado = eixo_escolhido
         st.session_state.subeixo_selecionado = subeixo_escolhido if subeixo_escolhido != "Nenhum" else ""
         st.session_state.pagina = "editor"
         st.rerun()
@@ -227,7 +248,6 @@ if st.session_state.pagina == "home":
         for idx_original, nota in enumerate(notas_salvas):
             eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
             subeixo_da_nota = nota.get("subeixo", "")
-            bate_eixo = (filtro_eixo == "Todos()", eixo_da_nota == filtro_eixo if filtro_eixo != "Todos" else True)
             bate_eixo = (filtro_eixo == "Todos" or eixo_da_nota == filtro_eixo)
             bate_sub = (filtro_sub == "Todos" or subeixo_da_nota == filtro_sub)
             termo = busca.lower()
@@ -260,7 +280,6 @@ if st.session_state.pagina == "home":
                         with b_col1:
                             if st.button("Ver Nota", key=f"ver_{idx_original}", use_container_width=True):
                                 st.session_state.nota_visualizar = nota
-                                st.session_state.nota_visualizar_index = idx_original
                                 st.session_state.pagina = "visualizar"
                                 st.rerun()
                         with b_col2:
@@ -275,7 +294,7 @@ if st.session_state.pagina == "home":
                                 st.rerun()
 
 elif st.session_state.pagina == "visualizar":
-    # --- TELA INTRÍNSECA DE LEITURA TOTAL ---
+    # --- TELA DE LEITURA COMPLETA ---
     nota_atual = st.session_state.nota_visualizar
     eixo_display = nota_atual.get('eixo', 'Clínica')
     sub_display = f" | {nota_atual.get('subeixo')}" if nota_atual.get('subeixo') else ""
@@ -292,7 +311,7 @@ elif st.session_state.pagina == "visualizar":
     st.markdown(tag_html, unsafe_allow_html=True)
     st.markdown("---")
     
-    # Executa a renderização puramente textual
+    # Renderiza o texto processando todos os grifos em tempo real
     conteudo_renderizado = formatar_texto_customizado(nota_atual['conteudo'])
     st.markdown(conteudo_renderizado, unsafe_allow_html=True)
     st.markdown("---")
@@ -300,7 +319,6 @@ elif st.session_state.pagina == "visualizar":
     if st.button("Voltar para o Início", use_container_width=True, key="btn_voltar_visualizar"):
         st.session_state.pagina = "home"
         st.session_state.nota_visualizar = None
-        st.session_state.nota_visualizar_index = None
         st.rerun()
 
 elif st.session_state.pagina == "editor":
@@ -313,12 +331,23 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
     
-    with st.expander("💡 Guia de Formatação Rápida"):
+    # --- GUIA DE FORMATAÇÃO COM OS NOVOS MARCA-TEXTOS ---
+    with st.expander("💡 Guia de Formatação e Canetas Marca-Texto"):
         st.markdown("""
-        * *Negrito:* Use um asterisco simples em cada ponta. Ex: `*hipertensão*` vira **hipertensão**.
-        * _Itálico:_ Use um underline em cada ponta. Ex: `_Staphylococcus_` vira *Staphylococcus*.
-        * =Sublinhar=: Use o sinal de igual em cada ponta. Ex: `=checar exames=` vira <u>checar exames</u>.
-        * “ Citação: Digite as aspas normais no início de uma linha para criar um bloco destacado. Ex: `“ Paciente relata dor...`
+        **Estilos de Letra:**
+        * *Negrito:* Use um asterisco. Ex: `*hipertensão*` vira **hipertensão**.
+        * _Itálico:_ Use um underline. Ex: `_Staphylococcus_` vira *Staphylococcus*.
+        * =Sublinhar=: Use sinal de igual. Ex: `=checar exames=` vira <u>checar exames</u>.
+        * “ Citação: Adicione as aspas no início da linha para criar um bloco cinza destacado.
+        
+        **Canetas Marca-Texto de Fundo Claro (Sintaxe: `(seu texto)/COR`):**
+        * `(texto)/AMA` ➡️ Grifa com fundo **Amarelo**
+        * `(texto)/VED` ➡️ Grifa com fundo **Verde**
+        * `(texto)/AZU` ➡️ Grifa com fundo **Azul**
+        * `(texto)/ROS` ➡️ Grifa com fundo **Rosa**
+        * `(texto)/ROX` ➡️ Grifa com fundo **Roxo**
+        * `(texto)/VEM` ➡️ Grifa com fundo **Vermelho**
+        * `(texto)/LAR` ➡️ Grifa com fundo **Laranja**
         """)
     
     col_salvar, col_cancelar = st.columns(2)
