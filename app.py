@@ -5,16 +5,21 @@ from datetime import date
 
 # Nomes dos nossos arquivos locais
 ARQUIVO_NOTAS = "notas.json"
-ARQUIVO_MATERIAS = "materias.json"
+ARQUIVO_SUBEIXOS = "subeixos.json"
+
+# As 5 grandes áreas são fixas
+EIXOS_FIXOS = ["Cirurgia", "Clínica", "Ginecologia e Obstetrícia", "Pediatria", "Preventiva"]
 
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
 st.set_page_config(page_title="Medicina", page_icon="🏥")
 
-# Criamos variáveis de "estado" para o app lembrar onde estamos
+# Controle de navegação e seleções temporárias
 if "pagina" not in st.session_state:
     st.session_state.pagina = "home"
-if "materia_selecionada" not in st.session_state:
-    st.session_state.materia_selecionada = ""
+if "eixo_selecionado" not in st.session_state:
+    st.session_state.eixo_selecionado = ""
+if "subeixo_selecionado" not in st.session_state:
+    st.session_state.subeixo_selecionado = ""
 
 # --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
@@ -29,49 +34,61 @@ def salvar_nota(nova_nota):
     with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
         json.dump(notas, f, ensure_ascii=False, indent=4)
 
-def carregar_materias():
-    if os.path.exists(ARQUIVO_MATERIAS):
-        with open(ARQUIVO_MATERIAS, "r", encoding="utf-8") as f:
-            lista = json.load(f)
-            if lista: return lista
-    return ["Pediatria", "Genética", "Clínica Médica", "Ginecologia e Obstetrícia", "Cirurgia Geral"]
+def carregar_subeixos():
+    # Cria a estrutura zerada para os eixos fixos
+    estrutura_base = {eixo: [] for eixo in EIXOS_FIXOS}
+    if os.path.exists(ARQUIVO_SUBEIXOS):
+        with open(ARQUIVO_SUBEIXOS, "r", encoding="utf-8") as f:
+            dados_salvos = json.load(f)
+            # Mescla os dados salvos com a estrutura base (garante que os 5 eixos existam)
+            for eixo in EIXOS_FIXOS:
+                if eixo in dados_salvos:
+                    estrutura_base[eixo] = dados_salvos[eixo]
+    return estrutura_base
 
-def salvar_materias(nova_lista):
-    with open(ARQUIVO_MATERIAS, "w", encoding="utf-8") as f:
-        json.dump(nova_lista, f, ensure_ascii=False, indent=4)
+def salvar_subeixos(dados):
+    with open(ARQUIVO_SUBEIXOS, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=4)
 
-materias_disponiveis = carregar_materias()
+subeixos_db = carregar_subeixos()
 
 # --- POP-UP DE NOVA NOTA ---
 @st.dialog("Nova Anotação")
 def popup_selecionar_materia():
-    st.write("Em qual eixo você vai anotar agora?")
-    materia_escolhida = st.selectbox("Eixo/Matéria", materias_disponiveis, label_visibility="collapsed")
+    eixo_escolhido = st.selectbox("Selecione o Eixo Principal", EIXOS_FIXOS)
+    
+    # Carrega os subeixos disponíveis para o eixo selecionado
+    opcoes_subeixo = ["Nenhum"] + subeixos_db[eixo_escolhido]
+    subeixo_escolhido = st.selectbox("Subeixo (Opcional)", opcoes_subeixo)
     
     if st.button("Continuar para o editor ➡️", use_container_width=True):
-        # Salva a escolha e muda a página
-        st.session_state.materia_selecionada = materia_escolhida
+        st.session_state.eixo_selecionado = eixo_escolhido
+        st.session_state.subeixo_selecionado = subeixo_escolhido if subeixo_escolhido != "Nenhum" else ""
         st.session_state.pagina = "editor"
         st.rerun()
 
-# --- MENU LATERAL (APENAS CONFIGURAÇÕES) ---
+# --- MENU LATERAL (APENAS CONFIGURAÇÕES DE SUBEIXOS) ---
 with st.sidebar:
     st.header("⚙️ Configurações")
-    st.write("Gerenciar Eixos/Matérias")
-    nova_materia = st.text_input("Nova Matéria")
-    if st.button("Adicionar"):
-        if nova_materia and nova_materia not in materias_disponiveis:
-            materias_disponiveis.append(nova_materia)
-            salvar_materias(materias_disponiveis)
-            st.success("Adicionada!")
+    st.write("**Gerenciar Subeixos**")
+    
+    eixo_alvo = st.selectbox("Qual eixo deseja editar?", EIXOS_FIXOS)
+    
+    nova_tag = st.text_input(f"Novo Subeixo para {eixo_alvo}")
+    if st.button("Adicionar Subeixo"):
+        if nova_tag and nova_tag not in subeixos_db[eixo_alvo]:
+            subeixos_db[eixo_alvo].append(nova_tag)
+            salvar_subeixos(subeixos_db)
+            st.success("Adicionado!")
             st.rerun()
             
-    materia_para_remover = st.selectbox("Remover Matéria", [""] + materias_disponiveis)
+    st.markdown("---")
+    tag_para_remover = st.selectbox("Remover Subeixo", [""] + subeixos_db[eixo_alvo])
     if st.button("Remover"):
-        if materia_para_remover:
-            materias_disponiveis.remove(materia_para_remover)
-            salvar_materias(materias_disponiveis)
-            st.success("Removida!")
+        if tag_para_remover:
+            subeixos_db[eixo_alvo].remove(tag_para_remover)
+            salvar_subeixos(subeixos_db)
+            st.success("Removido!")
             st.rerun()
 
 # ==========================================
@@ -82,18 +99,24 @@ if st.session_state.pagina == "home":
     # --- TELA INICIAL ---
     st.title("🏥 Medicina")
     
-    # Botão de destaque na tela principal
     if st.button("➕ Nova Nota", type="primary", use_container_width=True):
         popup_selecionar_materia()
         
     st.markdown("---")
     
-    # Barra de busca e listagem
-    col1, col2 = st.columns(2)
+    # Barra de busca e filtros dinâmicos
+    col1, col2, col3 = st.columns(3)
     with col1:
-        busca = st.text_input("🔍 Buscar anotação")
+        busca = st.text_input("🔍 Buscar")
     with col2:
-        filtro_materia = st.selectbox("📁 Filtrar eixo", ["Todos"] + materias_disponiveis)
+        filtro_eixo = st.selectbox("📁 Eixo", ["Todos"] + EIXOS_FIXOS)
+    with col3:
+        if filtro_eixo != "Todos":
+            opcoes_filtro_sub = ["Todos"] + subeixos_db[filtro_eixo]
+            filtro_sub = st.selectbox("📂 Subeixo", opcoes_filtro_sub)
+        else:
+            filtro_sub = st.selectbox("📂 Subeixo", ["Selecione um Eixo primeiro"], disabled=True)
+            filtro_sub = "Todos"
 
     notas_salvas = carregar_notas()
     
@@ -102,22 +125,37 @@ if st.session_state.pagina == "home":
     else:
         notas_filtradas = []
         for nota in notas_salvas:
-            bate_materia = (filtro_materia == "Todos" or nota["materia"] == filtro_materia)
+            # Lógica de compatibilidade com notas antigas
+            eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
+            subeixo_da_nota = nota.get("subeixo", "")
+            
+            bate_eixo = (filtro_eixo == "Todos" or eixo_da_nota == filtro_eixo)
+            bate_sub = (filtro_sub == "Todos" or subeixo_da_nota == filtro_sub)
+            
             termo = busca.lower()
             bate_busca = (termo in nota["titulo"].lower() or termo in nota["conteudo"].lower())
-            if bate_materia and bate_busca:
+            
+            if bate_eixo and bate_sub and bate_busca:
                 notas_filtradas.append(nota)
 
+        if not notas_filtradas:
+            st.warning("Nenhuma nota encontrada com estes filtros.")
+            
         for nota in reversed(notas_filtradas):
-            with st.expander(f"{nota['data']} | {nota['materia']} - {nota['titulo']}"):
+            # Formata o cabeçalho dinamicamente
+            eixo_display = nota.get('eixo', nota.get('materia', 'Sem eixo'))
+            sub_display = f" 🔸 {nota.get('subeixo')}" if nota.get('subeixo') else ""
+            
+            with st.expander(f"{nota['data']} | {eixo_display}{sub_display} - {nota['titulo']}"):
                 st.write(nota['conteudo'])
 
 elif st.session_state.pagina == "editor":
     # --- TELA CHEIA DE EDIÇÃO ---
-    st.title(f"📁 {st.session_state.materia_selecionada}")
+    sub_titulo = f" 🔸 {st.session_state.subeixo_selecionado}" if st.session_state.subeixo_selecionado else ""
+    st.title(f"📁 {st.session_state.eixo_selecionado}{sub_titulo}")
     
     titulo_nota = st.text_input("Título do Caso ou Aula")
-    conteudo_nota = st.text_area("Suas anotações...", height=400) # Deixa a caixa de texto bem grande
+    conteudo_nota = st.text_area("Suas anotações...", height=400)
     
     col_salvar, col_cancelar = st.columns(2)
     
@@ -126,21 +164,22 @@ elif st.session_state.pagina == "editor":
             if titulo_nota and conteudo_nota:
                 nova_nota = {
                     "titulo": titulo_nota,
-                    "materia": st.session_state.materia_selecionada,
+                    "eixo": st.session_state.eixo_selecionado,
+                    "subeixo": st.session_state.subeixo_selecionado,
                     "conteudo": conteudo_nota,
                     "data": str(date.today())
                 }
                 salvar_nota(nova_nota)
-                # Limpa o estado e volta pra home
                 st.session_state.pagina = "home"
-                st.session_state.materia_selecionada = ""
+                st.session_state.eixo_selecionado = ""
+                st.session_state.subeixo_selecionado = ""
                 st.rerun()
             else:
                 st.warning("Preencha título e conteúdo.")
                 
     with col_cancelar:
         if st.button("❌ Cancelar", use_container_width=True):
-            # Abandona a edição e volta pra home
             st.session_state.pagina = "home"
-            st.session_state.materia_selecionada = ""
+            st.session_state.eixo_selecionado = ""
+            st.session_state.subeixo_selecionado = ""
             st.rerun()
