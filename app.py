@@ -20,15 +20,15 @@ CORES_EIXOS = {
     "Cirurgia": "#E65100"                     # Laranja
 }
 
-# Mapeamento dos comandos para fundos clarinhos (tons pastel confortáveis para leitura)
+# Configuração calibrada das cores do Marca-Texto: Rosa ultra claro e Vermelho em máximo destaque
 MAPA_MARKERS = {
-    "AMA": "#FFF59D",  # Amarelo claro
-    "VED": "#C8E6C9",  # Verde claro
-    "AZU": "#BBDEFB",  # Azul claro
-    "ROS": "#F8BBD0",  # Rosa claro
-    "ROX": "#E1BEE7",  # Roxo claro
-    "VEM": "#FFCDD2",  # Vermelho claro
-    "LAR": "#FFE0B2"   # Laranja claro
+    "AMA": "#FFF59D",  # Amarelo claro padrão
+    "VED": "#C8E6C9",  # Verde claro padrão
+    "AZU": "#BBDEFB",  # Azul claro padrão
+    "ROS": "#FFF0F5",  # Rosa Ultra Claro / Lavanda sutil
+    "ROX": "#E1BEE7",  # Roxo claro padrão
+    "VEM": "#FF3B30",  # Vermelho Vivo de Alerta Máximo (Máximo Destaque)
+    "LAR": "#FFE0B2"   # Laranja claro padrão
 }
 
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
@@ -88,14 +88,18 @@ def formatar_texto_customizado(texto):
         
         else:
             # 2. Compilador de Marca-Texto Customizado: (texto)/COR
-            # Procura por padrões como (exame)/AMA ou (conduta)/VED (case-insensitive)
             padrao_marca_texto = r'\((.*?)\)/(AMA|VED|AZU|ROS|ROX|VEM|LAR)'
             
             def substituir_marca(match):
                 conteudo_grifado = match.group(1)
                 codigo_cor = match.group(2).upper()
                 cor_fundo_hex = MAPA_MARKERS.get(codigo_cor, "#FFF59D")
-                return f"<mark style='background-color: {cor_fundo_hex}; color: #000000; padding: 2px 4px; border-radius: 4px;'>{conteudo_grifado}</mark>"
+                
+                # Se for vermelho (VEM), aplicamos texto branco para garantir leitura perfeita no fundo escuro de destaque
+                cor_texto = "#FFFFFF" if codigo_cor == "VEM" else "#000000"
+                font_weight = "700" if codigo_cor == "VEM" else "600"
+                
+                return f"<mark style='background-color: {cor_fundo_hex}; color: {cor_texto}; padding: 2px 5px; border-radius: 4px; font-weight: {font_weight};'>{conteudo_grifado}</mark>"
             
             linha = re.sub(padrao_marca_texto, substituir_marca, linha, flags=re.IGNORECASE)
             
@@ -311,7 +315,7 @@ elif st.session_state.pagina == "visualizar":
     st.markdown(tag_html, unsafe_allow_html=True)
     st.markdown("---")
     
-    # Renderiza o texto processando todos os grifos em tempo real
+    # Renderiza o texto processando as novas intensidades de cores
     conteudo_renderizado = formatar_texto_customizado(nota_atual['conteudo'])
     st.markdown(conteudo_renderizado, unsafe_allow_html=True)
     st.markdown("---")
@@ -331,7 +335,6 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
     
-    # --- GUIA DE FORMATAÇÃO COM OS NOVOS MARCA-TEXTOS ---
     with st.expander("💡 Guia de Formatação e Canetas Marca-Texto"):
         st.markdown("""
         **Estilos de Letra:**
@@ -340,14 +343,14 @@ elif st.session_state.pagina == "editor":
         * =Sublinhar=: Use sinal de igual. Ex: `=checar exames=` vira <u>checar exames</u>.
         * “ Citação: Adicione as aspas no início da linha para criar um bloco cinza destacado.
         
-        **Canetas Marca-Texto de Fundo Claro (Sintaxe: `(seu texto)/COR`):**
-        * `(texto)/AMA` ➡️ Grifa com fundo **Amarelo**
-        * `(texto)/VED` ➡️ Grifa com fundo **Verde**
-        * `(texto)/AZU` ➡️ Grifa com fundo **Azul**
-        * `(texto)/ROS` ➡️ Grifa com fundo **Rosa**
-        * `(texto)/ROX` ➡️ Grifa com fundo **Roxo**
-        * `(texto)/VEM` ➡️ Grifa com fundo **Vermelho**
-        * `(texto)/LAR` ➡️ Grifa com fundo **Laranja**
+        **Canetas Marca-Texto (Sintaxe: `(seu texto)/COR`):**
+        * `(texto)/ROS` ➡️ Grifa com fundo **Rosa Extra Claro** (Ideal para dados secundários)
+        * `(texto)/VEM` ➡️ Grifa com fundo **Vermelho Vivo e Destaque Máximo** (Ideal para Alertas Urgentes e Sinais de Choque)
+        * `(texto)/AMA` ➡️ Grifa com fundo **Amarelo claro**
+        * `(texto)/VED` ➡️ Grifa com fundo **Verde claro**
+        * `(texto)/AZU` ➡️ Grifa com fundo **Azul claro**
+        * `(texto)/ROX` ➡️ Grifa com fundo **Roxo claro**
+        * `(texto)/LAR` ➡️ Grifa com fundo **Laranja claro**
         """)
     
     col_salvar, col_cancelar = st.columns(2)
