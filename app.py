@@ -25,7 +25,6 @@ st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide")
 # --- ESTILO CSS CUSTOMIZADO (MINIMALISTA) ---
 st.markdown("""
 <style>
-/* Altera a cor do botão primário (Nova Nota e Salvar) de Vermelho para Grafite Escuro */
 button[kind="primary"] {
     background-color: #222222 !important;
     color: #FFFFFF !important;
@@ -36,7 +35,6 @@ button[kind="primary"]:hover {
     background-color: #444444 !important;
     border-color: #444444 !important;
 }
-/* Arredondamento padrão para os botões secundários */
 button[kind="secondary"] {
     border-radius: 8px !important;
 }
@@ -132,28 +130,50 @@ def popup_selecionar_materia():
         st.session_state.pagina = "editor"
         st.rerun()
 
-# --- MENU LATERAL (CONFIGURAÇÕES DE SUBEIXOS) ---
+# --- BARRA LATERAL (CENTRAL DE CONFIGURAÇÕES COESAS) ---
 with st.sidebar:
     st.header("⚙️ Configurações")
-    st.write("**Gerenciar Subeixos**")
     
-    eixo_alvo = st.selectbox("Qual eixo deseja editar?", EIXOS_FIXOS, key="config_eixo_alvo")
-    nova_tag = st.text_input(f"Novo Subeixo para {eixo_alvo}", key="config_nova_tag")
-    if st.button("Adicionar Subeixo", key="btn_add_subeixo"):
+    # 1. Seção: Gerenciar Subeixos
+    st.write("**Gerenciar Subeixos**")
+    eixo_alvo = st.selectbox("Selecione o eixo principal", EIXOS_FIXOS, key="config_eixo_alvo")
+    nova_tag = st.text_input(f"Novo subeixo para {eixo_alvo}", key="config_nova_tag")
+    if st.button("Adicionar Subeixo", key="btn_add_subeixo", use_container_width=True):
         if nova_tag and nova_tag not in subeixos_db[eixo_alvo]:
             subeixos_db[eixo_alvo].append(nova_tag)
             salvar_subeixos(subeixos_db)
             st.success("Adicionado!")
             st.rerun()
             
-    st.markdown("---")
-    tag_para_remover = st.selectbox("Remover Subeixo", [""] + subeixos_db[eixo_alvo], key="config_remover_tag")
-    if st.button("Remover", key="btn_rem_subeixo"):
+    tag_para_remover = st.selectbox("Remover subeixo existente", [""] + subeixos_db[eixo_alvo], key="config_remover_tag")
+    if st.button("Remover Subeixo", key="btn_rem_subeixo", use_container_width=True):
         if tag_para_remover:
             subeixos_db[eixo_alvo].remove(tag_para_remover)
             salvar_subeixos(subeixos_db)
             st.success("Removido!")
             st.rerun()
+            
+    st.markdown("---")
+    
+    # 2. Seção: Gerenciar Notas (Nova aba unificada ao lado)
+    st.write("**Gerenciar Notas**")
+    notas_painel = carregar_notas()
+    if notas_painel:
+        # Monta uma lista legível identificando a nota pelo Eixo + Título
+        opcoes_remover_notas = [f"{n.get('eixo', 'Clínica')} | {n['titulo']}" for n in notas_painel]
+        nota_alvo_remover = st.selectbox("Selecionar nota para excluir", [""] + opcoes_remover_notas, key="config_remover_nota")
+        
+        if st.button("Excluir Nota", key="btn_rem_nota_sidebar", use_container_width=True):
+            if nota_alvo_remover:
+                # Descobre o índice correto com base na seleção
+                idx_remover = opcoes_remover_notas.index(nota_alvo_remover)
+                notas_painel.pop(idx_remover)
+                with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
+                    json.dump(notas_painel, f, ensure_ascii=False, indent=4)
+                st.success("Nota excluída!")
+                st.rerun()
+    else:
+        st.caption("Nenhuma nota salva no banco de dados.")
 
 # ==========================================
 # ROTEAMENTO DE TELAS
@@ -163,7 +183,6 @@ if st.session_state.pagina == "home":
     # --- TELA INICIAL ---
     st.title("🏥 Medicina")
     
-    # Botão principal agora sem emoji e com a cor customizada pelo CSS (Grafite)
     if st.button("Nova Nota", type="primary", use_container_width=True, key="btn_nova_nota_main"):
         st.session_state.modo_editor = "criar"
         st.session_state.edit_titulo = ""
@@ -172,7 +191,7 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Barra de busca e filtros dinâmicos
+    # Filtros
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar", key="busca_principal")
@@ -212,7 +231,7 @@ if st.session_state.pagina == "home":
         else:
             st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
-            # --- SISTEMA DE GALERIA EM GRID ---
+            # --- GALERIA EM GRID ---
             num_colunas = 2
             cols = st.columns(num_colunas)
             
@@ -244,7 +263,6 @@ if st.session_state.pagina == "home":
                         """
                         st.markdown(tag_html, unsafe_allow_html=True)
                         
-                        # Botões lado a lado, sem emojis e com gap reduzido para otimizar espaço
                         b_col1, b_col2 = st.columns(2, gap="small")
                         with b_col1:
                             if st.button("Ver Nota", key=f"ver_{idx_original}", use_container_width=True):
@@ -261,7 +279,7 @@ if st.session_state.pagina == "home":
                                 st.rerun()
 
 elif st.session_state.pagina == "editor":
-    # --- TELA CHEIA DE EDIÇÃO/CRIAÇÃO ---
+    # --- TELA CHEIA DE EDIÇÃO/CRIAÇÃO CLEAN ---
     sub_titulo = f" 🔸 {st.session_state.subeixo_selecionado}" if st.session_state.subeixo_selecionado else ""
     
     if st.session_state.modo_editor == "editar":
@@ -272,13 +290,10 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
     
-    if st.session_state.modo_editor == "editar":
-        col_salvar, col_cancelar, col_excluir = st.columns([2, 2, 1.2])
-    else:
-        col_salvar, col_cancelar = st.columns(2)
+    # Apenas duas colunas limpas na parte inferior (Salvar e Cancelar)
+    col_salvar, col_cancelar = st.columns(2)
     
     with col_salvar:
-        # Esse botão também assume a cor Grafite automaticamente por ser 'primary'
         if st.button("Salvar Anotação", type="primary", use_container_width=True, key="btn_salvar_nota"):
             if titulo_nota and conteudo_nota:
                 nova_nota = {
@@ -308,15 +323,3 @@ elif st.session_state.pagina == "editor":
         if st.button("Cancelar", use_container_width=True, key="btn_cancelar_nota"):
             st.session_state.pagina = "home"
             st.rerun()
-
-    if st.session_state.modo_editor == "editar":
-        with col_excluir:
-            if st.button("Excluir", type="secondary", use_container_width=True, key="btn_excluir_nota_edit"):
-                notas = carregar_notas()
-                idx_alvo = st.session_state.nota_index
-                if idx_alvo is not None and idx_alvo < len(notas):
-                    notas.pop(idx_alvo)
-                    with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
-                        json.dump(notas, f, ensure_ascii=False, indent=4)
-                st.session_state.pagina = "home"
-                st.rerun()
