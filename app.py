@@ -10,7 +10,7 @@ ARQUIVO_SUBEIXOS = "subeixos.json"
 # As 5 grandes áreas são fixas
 EIXOS_FIXOS = ["Cirurgia", "Clínica", "Ginecologia e Obstetrícia", "Pediatria", "Preventiva"]
 
-# Cores sólidas e marcantes para garantir excelente leitura com texto branco
+# Cores sólidas e marcantes para as etiquetas com texto branco
 CORES_EIXOS = {
     "Preventiva": "#D49A00",                  # Amarelo Escuro / Ouro
     "Pediatria": "#7B1FA2",                   # Roxo
@@ -28,6 +28,14 @@ if "eixo_selecionado" not in st.session_state:
     st.session_state.eixo_selecionado = ""
 if "subeixo_selecionado" not in st.session_state:
     st.session_state.subeixo_selecionado = ""
+if "modo_editor" not in st.session_state:
+    st.session_state.modo_editor = "criar"
+if "edit_titulo" not in st.session_state:
+    st.session_state.edit_titulo = ""
+if "edit_conteudo" not in st.session_state:
+    st.session_state.edit_conteudo = ""
+if "nota_index" not in st.session_state:
+    st.session_state.nota_index = None
 
 # --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
@@ -65,7 +73,32 @@ def salvar_subeixos(dados):
 
 subeixos_db = carregar_subeixos()
 
-# --- POP-UP DE NOVA NOTA ---
+# --- POP-UP PARA VISUALIZAR A NOTA COMPLETA ---
+@st.dialog("Visualizar Anotação")
+def dialog_ver_nota(nota, cor_tag, eixo, subeixo):
+    tag_html = f"""
+    <div style="margin-bottom: 15px;">
+        <span style="
+            background-color: {cor_tag};
+            color: #FFFFFF;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+            text-transform: uppercase;
+        ">
+            {eixo}{subeixo}
+        </span>
+    </div>
+    """
+    st.markdown(tag_html, unsafe_allow_html=True)
+    st.subheader(nota['titulo'])
+    st.markdown("---")
+    st.write(nota['conteudo'])
+    st.write("")
+
+# --- POP-UP DE NOVA NOTA (SELEÇÃO DE ÁREA) ---
 @st.dialog("Nova Anotação")
 def popup_selecionar_materia():
     eixo_escolhido = st.selectbox("Selecione o Eixo Principal", EIXOS_FIXOS, key="popup_eixo")
@@ -110,6 +143,9 @@ if st.session_state.pagina == "home":
     st.title("🏥 Medicina")
     
     if st.button("➕ Nova Nota", type="primary", use_container_width=True, key="btn_nova_nota_main"):
+        st.session_state.modo_editor = "criar"
+        st.session_state.edit_titulo = ""
+        st.session_state.edit_conteudo = ""
         popup_selecionar_materia()
         
     st.markdown("---")
@@ -137,7 +173,8 @@ if st.session_state.pagina == "home":
         st.info("Sua base está vazia. Clique em Nova Nota para começar.")
     else:
         notas_filtradas = []
-        for nota in notas_salvas:
+        # Guardamos o índice original para conseguir editar a nota correta depois
+        for idx_original, nota in enumerate(notas_salvas):
             eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
             subeixo_da_nota = nota.get("subeixo", "")
             
@@ -147,70 +184,80 @@ if st.session_state.pagina == "home":
             bate_busca = (termo in nota["titulo"].lower() or termo in nota["conteudo"].lower())
             
             if bate_eixo and bate_sub and bate_busca:
-                notas_filtradas.append(nota)
+                notas_filtradas.append((idx_original, nota))
 
         if not notas_filtradas:
             st.warning("Nenhuma nota encontrada com estes filtros.")
         else:
             st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
-            # --- SISTEMA DE GALERIA EM GRID NATIVO (100% SEGURO) ---
+            # --- SISTEMA DE GALERIA EM GRID ---
             num_colunas = 2
             cols = st.columns(num_colunas)
             
-            for idx, nota in enumerate(reversed(notas_filtradas)):
+            for idx_grid, (idx_original, nota) in enumerate(reversed(notas_filtradas)):
                 eixo_display = nota.get('eixo', nota.get('materia', 'Clínica'))
                 sub_display = f" | {nota.get('subeixo')}" if nota.get('subeixo') else ""
                 cor_tag = CORES_EIXOS.get(eixo_display, "#718096")
                 
-                with cols[idx % num_colunas]:
-                    # Criamos o quadrado arredondado branco nativo do Streamlit
+                with cols[idx_grid % num_colunas]:
                     with st.container(border=True):
-                        # Título limpo
-                        st.markdown(f"### {nota['titulo']}")
+                        # Título exposto no topo do card
+                        st.markdown(f"#### {nota['titulo']}")
                         
-                        # Texto puro da nota (sem risco de quebrar ou virar código)
-                        st.write(nota['conteudo'])
-                        
-                        # Espaçador
-                        st.write("")
-                        
-                        # Apenas a etiqueta final usa HTML controlado e isolado
+                        # Tag com letras brancas e fundo correspondente
                         tag_html = f"""
-                        <span style="
-                            background-color: {cor_tag};
-                            color: #FFFFFF;
-                            padding: 6px 14px;
-                            border-radius: 8px;
-                            font-size: 0.75rem;
-                            font-weight: 700;
-                            display: inline-block;
-                            letter-spacing: 0.5px;
-                            text-transform: uppercase;
-                        ">
-                            {eixo_display}{sub_display}
-                        </span>
+                        <div style="margin-top: 5px; margin-bottom: 15px;">
+                            <span style="
+                                background-color: {cor_tag};
+                                color: #FFFFFF;
+                                padding: 4px 10px;
+                                border-radius: 6px;
+                                font-size: 0.75rem;
+                                font-weight: 700;
+                                display: inline-block;
+                                text-transform: uppercase;
+                                letter-spacing: 0.3px;
+                            ">
+                                {eixo_display}{sub_display}
+                            </span>
+                        </div>
                         """
                         st.markdown(tag_html, unsafe_allow_html=True)
                         
-                        # Botão discreto para apagar notas corrompidas antigas
-                        st.markdown("---")
-                        if st.button("🗑️ Excluir Nota", key=f"del_nota_{idx}"):
-                            if nota in notas_salvas:
-                                notas_salvas.remove(nota)
-                                with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
-                                    json.dump(notas_salvas, f, ensure_ascii=False, indent=4)
+                        # Botões de Ação lado a lado (Ver e Editar)
+                        b_col1, b_col2 = st.columns(2)
+                        with b_col1:
+                            if st.button("👁️ Ver Nota", key=f"ver_{idx_original}", use_container_width=True):
+                                dialog_ver_nota(nota, cor_tag, eixo_display, sub_display)
+                        with b_col2:
+                            if st.button("✏️ Editar", key=f"edit_{idx_original}", use_container_width=True):
+                                st.session_state.pagina = "editor"
+                                st.session_state.modo_editor = "editar"
+                                st.session_state.nota_index = idx_original
+                                st.session_state.eixo_selecionado = eixo_display
+                                st.session_state.subeixo_selecionado = nota.get("subeixo", "")
+                                st.session_state.edit_titulo = nota["titulo"]
+                                st.session_state.edit_conteudo = nota["conteudo"]
                                 st.rerun()
 
 elif st.session_state.pagina == "editor":
-    # --- TELA CHEIA DE EDIÇÃO ---
+    # --- TELA CHEIA DE EDIÇÃO/CRIAÇÃO ---
     sub_titulo = f" 🔸 {st.session_state.subeixo_selecionado}" if st.session_state.subeixo_selecionado else ""
-    st.title(f"📁 {st.session_state.eixo_selecionado}{sub_titulo}")
     
-    titulo_nota = st.text_input("Título do Caso ou Aula", key="editor_titulo")
-    conteudo_nota = st.text_area("Suas anotações...", height=400, key="editor_conteudo")
+    if st.session_state.modo_editor == "editar":
+        st.title(f"✏️ Editando: {st.session_state.eixo_selecionado}{sub_titulo}")
+    else:
+        st.title(f"📁 Nova Nota: {st.session_state.eixo_selecionado}{sub_titulo}")
     
-    col_salvar, col_cancelar = st.columns(2)
+    titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
+    conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
+    
+    # Organização dinâmica dos botões inferiores
+    if st.session_state.modo_editor == "editar":
+        col_salvar, col_cancelar, col_excluir = st.columns([2, 2, 1.2])
+    else:
+        col_salvar, col_cancelar = st.columns(2)
     
     with col_salvar:
         if st.button("💾 Salvar Anotação", type="primary", use_container_width=True, key="btn_salvar_nota"):
@@ -222,10 +269,19 @@ elif st.session_state.pagina == "editor":
                     "conteudo": conteudo_nota,
                     "data": str(date.today())
                 }
-                salvar_nota(nova_nota)
+                
+                if st.session_state.modo_editor == "criar":
+                    salvar_nota(nova_nota)
+                else:
+                    # Sobrescreve a nota antiga no índice correto
+                    notas = carregar_notas()
+                    idx_alvo = st.session_state.nota_index
+                    if idx_alvo is not None and idx_alvo < len(notas):
+                        notas[idx_alvo] = nova_nota
+                        with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
+                            json.dump(notas, f, ensure_ascii=False, indent=4)
+                
                 st.session_state.pagina = "home"
-                st.session_state.eixo_selecionado = ""
-                st.session_state.subeixo_selecionado = ""
                 st.rerun()
             else:
                 st.warning("Preencha título e conteúdo.")
@@ -233,6 +289,16 @@ elif st.session_state.pagina == "editor":
     with col_cancelar:
         if st.button("❌ Cancelar", use_container_width=True, key="btn_cancelar_nota"):
             st.session_state.pagina = "home"
-            st.session_state.eixo_selecionado = ""
-            st.session_state.subeixo_selecionado = ""
             st.rerun()
+
+    if st.session_state.modo_editor == "editar":
+        with col_excluir:
+            if st.button("🗑️ Excluir", type="secondary", use_container_width=True, key="btn_excluir_nota_edit"):
+                notas = carregar_notas()
+                idx_alvo = st.session_state.nota_index
+                if idx_alvo is not None and idx_alvo < len(notas):
+                    notas.pop(idx_alvo)
+                    with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
+                        json.dump(notas, f, ensure_ascii=False, indent=4)
+                st.session_state.pagina = "home"
+                st.rerun()
