@@ -86,4 +86,4 @@ with st.sidebar:
             st.rerun()
             
     st.markdown("---")
-    tag_para_remover = st.selectbox("Remover Subeixo", [""] + subeixos
+    tag_para_remover = st.selectbox("Remover Subeixo", [""] + subeixos)
