@@ -20,15 +20,15 @@ CORES_EIXOS = {
     "Cirurgia": "#E65100"                     # Laranja
 }
 
-# Configuração calibrada das cores do Marca-Texto: Rosa ultra claro e Vermelho em máximo destaque
+# Configuração ajustada: Rosa mais nítido/escuro restaurado e Vermelho mantido em destaque total
 MAPA_MARKERS = {
-    "AMA": "#FFF59D",  # Amarelo claro padrão
-    "VED": "#C8E6C9",  # Verde claro padrão
-    "AZU": "#BBDEFB",  # Azul claro padrão
-    "ROS": "#FFF0F5",  # Rosa Ultra Claro / Lavanda sutil
-    "ROX": "#E1BEE7",  # Roxo claro padrão
-    "VEM": "#FF3B30",  # Vermelho Vivo de Alerta Máximo (Máximo Destaque)
-    "LAR": "#FFE0B2"   # Laranja claro padrão
+    "AMA": "#FFF59D",  # Amarelo claro
+    "VED": "#C8E6C9",  # Verde claro
+    "AZU": "#BBDEFB",  # Azul claro
+    "ROS": "#FFB7D5",  # Rosa claro (tom anterior um pouco mais escuro e visível)
+    "ROX": "#E1BEE7",  # Roxo claro
+    "VEM": "#FF3B30",  # Vermelho Vivo de Alerta Máximo (Mantido)
+    "LAR": "#FFE0B2"   # Laranja claro
 }
 
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
@@ -95,7 +95,7 @@ def formatar_texto_customizado(texto):
                 codigo_cor = match.group(2).upper()
                 cor_fundo_hex = MAPA_MARKERS.get(codigo_cor, "#FFF59D")
                 
-                # Se for vermelho (VEM), aplicamos texto branco para garantir leitura perfeita no fundo escuro de destaque
+                # Se for vermelho (VEM), aplicamos texto branco para legibilidade no fundo escuro de destaque
                 cor_texto = "#FFFFFF" if codigo_cor == "VEM" else "#000000"
                 font_weight = "700" if codigo_cor == "VEM" else "600"
                 
@@ -315,7 +315,6 @@ elif st.session_state.pagina == "visualizar":
     st.markdown(tag_html, unsafe_allow_html=True)
     st.markdown("---")
     
-    # Renderiza o texto processando as novas intensidades de cores
     conteudo_renderizado = formatar_texto_customizado(nota_atual['conteudo'])
     st.markdown(conteudo_renderizado, unsafe_allow_html=True)
     st.markdown("---")
@@ -344,8 +343,8 @@ elif st.session_state.pagina == "editor":
         * “ Citação: Adicione as aspas no início da linha para criar um bloco cinza destacado.
         
         **Canetas Marca-Texto (Sintaxe: `(seu texto)/COR`):**
-        * `(texto)/ROS` ➡️ Grifa com fundo **Rosa Extra Claro** (Ideal para dados secundários)
-        * `(texto)/VEM` ➡️ Grifa com fundo **Vermelho Vivo e Destaque Máximo** (Ideal para Alertas Urgentes e Sinais de Choque)
+        * `(texto)/ROS` ➡️ Grifa com fundo **Rosa Claro Clássico**
+        * `(texto)/VEM` ➡️ Grifa com fundo **Vermelho Vivo e Destaque Máximo** (Alerta Máximo)
         * `(texto)/AMA` ➡️ Grifa com fundo **Amarelo claro**
         * `(texto)/VED` ➡️ Grifa com fundo **Verde claro**
         * `(texto)/AZU` ➡️ Grifa com fundo **Azul claro**
