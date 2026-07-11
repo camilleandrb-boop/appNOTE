@@ -10,17 +10,17 @@ ARQUIVO_SUBEIXOS = "subeixos.json"
 # As 5 grandes áreas são fixas
 EIXOS_FIXOS = ["Cirurgia", "Clínica", "Ginecologia e Obstetrícia", "Pediatria", "Preventiva"]
 
-# Mapeamento de cores suaves (pastéis) para o fundo de cada eixo
+# Cores sólidas e marcantes para garantir excelente leitura com texto branco
 CORES_EIXOS = {
-    "Preventiva": "#FFF9C4",                  # Amarelo claro
-    "Pediatria": "#F3E5F5",                   # Roxo claro
-    "Ginecologia e Obstetrícia": "#FCE4EC",   # Rosa claro
-    "Clínica": "#E3F2FD",                      # Azul claro
-    "Cirurgia": "#FFE0B2"                     # Laranja claro
+    "Preventiva": "#D49A00",                  # Amarelo Escuro / Ouro
+    "Pediatria": "#7B1FA2",                   # Roxo
+    "Ginecologia e Obstetrícia": "#C2185B",   # Rosa Escuro / Magenta
+    "Clínica": "#1976D2",                      # Azul Médico
+    "Cirurgia": "#E65100"                     # Laranja
 }
 
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
-st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide") # 'wide' ajuda na disposição da galeria
+st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide")
 
 if "pagina" not in st.session_state:
     st.session_state.pagina = "home"
@@ -145,7 +145,6 @@ if st.session_state.pagina == "home":
             st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
             # --- SISTEMA DE GALERIA (GRID) ---
-            # Define o número de colunas na galeria (2 colunas fica excelente em iPads e iPhones)
             num_colunas = 2
             cols = st.columns(num_colunas)
             
@@ -153,33 +152,46 @@ if st.session_state.pagina == "home":
                 eixo_display = nota.get('eixo', nota.get('materia', 'Clínica'))
                 sub_display = f" | {nota.get('subeixo')}" if nota.get('subeixo') else ""
                 
-                # Pega a cor correspondente ou usa cinza claro se não encontrar
-                cor_fundo = CORES_EIXOS.get(eixo_display, "#F5F5F5")
+                # Pega a cor correspondente da etiqueta
+                cor_tag = CORES_EIXOS.get(eixo_display, "#718096")
                 
-                # Monta a caixinha em HTML com cantos arredondados e cor customizada
+                # Monta o quadrado em HTML branco com a tag colorida embaixo
                 card_html = f"""
                 <div style="
-                    background-color: {cor_fundo};
-                    padding: 18px;
+                    background-color: #FFFFFF;
+                    padding: 20px;
                     border-radius: 14px;
                     margin-bottom: 16px;
-                    color: #2D3748;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.03);
-                    border: 1px solid rgba(0,0,0,0.05);
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+                    border: 1px solid #E2E8F0;
                 ">
-                    <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 6px;">
-                        📅 {nota['data']} - {eixo_display.upper()}{sub_display.upper()}
-                    </div>
                     <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; color: #1A202C;">
                         {nota['titulo']}
                     </div>
-                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #2D3748;">
+                    
+                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #4A5568; margin-bottom: 18px;">
                         {nota['conteudo']}
+                    </div>
+                    
+                    # Etiqueta do Eixo (Letra branca e fundo colorido na parte de baixo)
+                    <div style="margin-top: auto;">
+                        <span style="
+                            background-color: {cor_tag};
+                            color: #FFFFFF;
+                            padding: 5px 12px;
+                            border-radius: 8px;
+                            font-size: 0.75rem;
+                            font-weight: 700;
+                            display: inline-block;
+                            letter-spacing: 0.5px;
+                            text-transform: uppercase;
+                        ">
+                            {eixo_display}{sub_display}
+                        </span>
                     </div>
                 </div>
                 """
                 
-                # Distribui os cards entre as colunas criadas
                 with cols[idx % num_colunas]:
                     st.markdown(card_html, unsafe_allow_html=True)
 
