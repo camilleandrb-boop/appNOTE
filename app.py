@@ -10,7 +10,7 @@ ARQUIVO_SUBEIXOS = "subeixos.json"
 # As 5 grandes áreas são fixas
 EIXOS_FIXOS = ["Cirurgia", "Clínica", "Ginecologia e Obstetrícia", "Pediatria", "Preventiva"]
 
-# Cores sólidas e marcantes para as etiquetas com texto branco
+# Cores sólidas para as etiquetas com texto branco
 CORES_EIXOS = {
     "Preventiva": "#D49A00",                  # Amarelo Escuro / Ouro
     "Pediatria": "#7B1FA2",                   # Roxo
@@ -21,6 +21,27 @@ CORES_EIXOS = {
 
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
 st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide")
+
+# --- ESTILO CSS CUSTOMIZADO (MINIMALISTA) ---
+st.markdown("""
+<style>
+/* Altera a cor do botão primário (Nova Nota e Salvar) de Vermelho para Grafite Escuro */
+button[kind="primary"] {
+    background-color: #222222 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #222222 !important;
+    border-radius: 8px !important;
+}
+button[kind="primary"]:hover {
+    background-color: #444444 !important;
+    border-color: #444444 !important;
+}
+/* Arredondamento padrão para os botões secundários */
+button[kind="secondary"] {
+    border-radius: 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 if "pagina" not in st.session_state:
     st.session_state.pagina = "home"
@@ -142,7 +163,8 @@ if st.session_state.pagina == "home":
     # --- TELA INICIAL ---
     st.title("🏥 Medicina")
     
-    if st.button("➕ Nova Nota", type="primary", use_container_width=True, key="btn_nova_nota_main"):
+    # Botão principal agora sem emoji e com a cor customizada pelo CSS (Grafite)
+    if st.button("Nova Nota", type="primary", use_container_width=True, key="btn_nova_nota_main"):
         st.session_state.modo_editor = "criar"
         st.session_state.edit_titulo = ""
         st.session_state.edit_conteudo = ""
@@ -173,7 +195,6 @@ if st.session_state.pagina == "home":
         st.info("Sua base está vazia. Clique em Nova Nota para começar.")
     else:
         notas_filtradas = []
-        # Guardamos o índice original para conseguir editar a nota correta depois
         for idx_original, nota in enumerate(notas_salvas):
             eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
             subeixo_da_nota = nota.get("subeixo", "")
@@ -202,10 +223,8 @@ if st.session_state.pagina == "home":
                 
                 with cols[idx_grid % num_colunas]:
                     with st.container(border=True):
-                        # Título exposto no topo do card
                         st.markdown(f"#### {nota['titulo']}")
                         
-                        # Tag com letras brancas e fundo correspondente
                         tag_html = f"""
                         <div style="margin-top: 5px; margin-bottom: 15px;">
                             <span style="
@@ -225,13 +244,13 @@ if st.session_state.pagina == "home":
                         """
                         st.markdown(tag_html, unsafe_allow_html=True)
                         
-                        # Botões de Ação lado a lado (Ver e Editar)
-                        b_col1, b_col2 = st.columns(2)
+                        # Botões lado a lado, sem emojis e com gap reduzido para otimizar espaço
+                        b_col1, b_col2 = st.columns(2, gap="small")
                         with b_col1:
-                            if st.button("👁️ Ver Nota", key=f"ver_{idx_original}", use_container_width=True):
+                            if st.button("Ver Nota", key=f"ver_{idx_original}", use_container_width=True):
                                 dialog_ver_nota(nota, cor_tag, eixo_display, sub_display)
                         with b_col2:
-                            if st.button("✏️ Editar", key=f"edit_{idx_original}", use_container_width=True):
+                            if st.button("Editar", key=f"edit_{idx_original}", use_container_width=True):
                                 st.session_state.pagina = "editor"
                                 st.session_state.modo_editor = "editar"
                                 st.session_state.nota_index = idx_original
@@ -253,14 +272,14 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
     
-    # Organização dinâmica dos botões inferiores
     if st.session_state.modo_editor == "editar":
         col_salvar, col_cancelar, col_excluir = st.columns([2, 2, 1.2])
     else:
         col_salvar, col_cancelar = st.columns(2)
     
     with col_salvar:
-        if st.button("💾 Salvar Anotação", type="primary", use_container_width=True, key="btn_salvar_nota"):
+        # Esse botão também assume a cor Grafite automaticamente por ser 'primary'
+        if st.button("Salvar Anotação", type="primary", use_container_width=True, key="btn_salvar_nota"):
             if titulo_nota and conteudo_nota:
                 nova_nota = {
                     "titulo": titulo_nota,
@@ -273,7 +292,6 @@ elif st.session_state.pagina == "editor":
                 if st.session_state.modo_editor == "criar":
                     salvar_nota(nova_nota)
                 else:
-                    # Sobrescreve a nota antiga no índice correto
                     notas = carregar_notas()
                     idx_alvo = st.session_state.nota_index
                     if idx_alvo is not None and idx_alvo < len(notas):
@@ -287,13 +305,13 @@ elif st.session_state.pagina == "editor":
                 st.warning("Preencha título e conteúdo.")
                 
     with col_cancelar:
-        if st.button("❌ Cancelar", use_container_width=True, key="btn_cancelar_nota"):
+        if st.button("Cancelar", use_container_width=True, key="btn_cancelar_nota"):
             st.session_state.pagina = "home"
             st.rerun()
 
     if st.session_state.modo_editor == "editar":
         with col_excluir:
-            if st.button("🗑️ Excluir", type="secondary", use_container_width=True, key="btn_excluir_nota_edit"):
+            if st.button("Excluir", type="secondary", use_container_width=True, key="btn_excluir_nota_edit"):
                 notas = carregar_notas()
                 idx_alvo = st.session_state.nota_index
                 if idx_alvo is not None and idx_alvo < len(notas):
