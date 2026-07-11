@@ -20,17 +20,6 @@ CORES_EIXOS = {
     "Cirurgia": "#E65100"                     # Laranja
 }
 
-# Tons pastéis/clarinhos pré-definidos para o Marca-Texto
-MAPA_CORES_MARCADOR = {
-    "Amarelo": "#FFF59D",
-    "Verde": "#C8E6C9",
-    "Azul": "#BBDEFB",
-    "Rosa": "#F8BBD0",
-    "Roxo": "#E1BEE7",
-    "Laranja": "#FFE0B2",
-    "Vermelho": "#FFCDD2"
-}
-
 # --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
 st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide")
 
@@ -71,11 +60,9 @@ if "nota_visualizar" not in st.session_state:
     st.session_state.nota_visualizar = None
 if "nota_visualizar_index" not in st.session_state:
     st.session_state.nota_visualizar_index = None
-if "cor_marcador_atual" not in st.session_state:
-    st.session_state.cor_marcador_atual = "Amarelo"
 
-# --- MOTOR DE FORMATAÇÃO E MARCA-TEXTO MULTIPLO ---
-def formatar_texto_customizado(texto, lista_destaques=None):
+# --- MOTOR DE FORMATAÇÃO TEXTUAL LIMPO ---
+def formatar_texto_customizado(texto):
     if not texto:
         return ""
     
@@ -92,7 +79,6 @@ def formatar_texto_customizado(texto, lista_destaques=None):
         
         else:
             # 2. Negrito (*)
-            linha = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', inline=False if not linha else True, string=linha)
             linha = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', linha)
             
             # 3. Itálico (_)
@@ -106,22 +92,7 @@ def formatar_texto_customizado(texto, lista_destaques=None):
             else:
                 linhas_formatadas.append(f"<p style='margin: 4px 0; line-height: 1.6; color: #2D3748;'>{linha}</p>")
                 
-    resultado_html = "".join(linhas_formatadas)
-    
-    # 5. Aplicação em cascata de todos os grifos salvos no arquivo JSON
-    if lista_destaques:
-        for dest in lista_destaques:
-            termo = dest.get("termo")
-            cor_hex = dest.get("cor")
-            if termo and cor_hex:
-                try:
-                    # Aplica a tag <mark> apenas fora de outras tags HTML estruturais
-                    padrao = re.compile(r'(?<!<[^>]*)(?i)(' + re.escape(termo) + r')(?![^<]*>)')
-                    resultado_html = padrao.sub(f"<mark style='background-color: {cor_hex}; color: #000000; padding: 2px 4px; border-radius: 4px;'>\\1</mark>", resultado_html)
-                except Exception:
-                    pass
-            
-    return resultado_html
+    return "".join(linhas_formatadas)
 
 # --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
@@ -133,8 +104,14 @@ def carregar_notas():
             return []
     return []
 
+def salvar_nota(nova_nota):
+    notas = carregar_notas()
+    notas.append(nova_nota)
+    with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
+        json.dump(notas, f, ensure_ascii=False, indent=4)
+
 def carregar_subeixos():
-    estrutura_base = {eixo: [] for eixo in EIXOS_FIXOS}
+    blueprint = {eixo: [] for eixo in EIXOS_FIXOS}
     if os.path.exists(ARQUIVO_SUBEIXOS):
         try:
             with open(ARQUIVO_SUBEIXOS, "r", encoding="utf-8") as f:
@@ -142,11 +119,10 @@ def carregar_subeixos():
                 if isinstance(dados_salvos, dict):
                     for eixo in EIXOS_FIXOS:
                         if eixo in dados_salvos:
-                            blueprint = dados_salvos[eixo]
-                            estrutura_base[eixo] = blueprint
+                            blueprint[eixo] = dados_salvos[eixo]
         except Exception:
             pass
-    return estrutura_base
+    return blueprint
 
 def salvar_subeixos(dados):
     with open(ARQUIVO_SUBEIXOS, "w", encoding="utf-8") as f:
@@ -162,7 +138,7 @@ def popup_selecionar_materia():
     subeixo_escolhido = st.selectbox("Subeixo (Opcional)", opcoes_subeixo, key="popup_subeixo")
     
     if st.button("Continuar para o editor ➡️", use_container_width=True, key="btn_continuar"):
-        st.session_state.eixo_selecionado = eixo_escolhido
+        st.session_state.eixo_selecionado = axis = eixo_escolhido
         st.session_state.subeixo_selecionado = subeixo_escolhido if subeixo_escolhido != "Nenhum" else ""
         st.session_state.pagina = "editor"
         st.rerun()
@@ -251,6 +227,7 @@ if st.session_state.pagina == "home":
         for idx_original, nota in enumerate(notas_salvas):
             eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
             subeixo_da_nota = nota.get("subeixo", "")
+            bate_eixo = (filtro_eixo == "Todos()", eixo_da_nota == filtro_eixo if filtro_eixo != "Todos" else True)
             bate_eixo = (filtro_eixo == "Todos" or eixo_da_nota == filtro_eixo)
             bate_sub = (filtro_sub == "Todos" or subeixo_da_nota == filtro_sub)
             termo = busca.lower()
@@ -298,9 +275,8 @@ if st.session_state.pagina == "home":
                                 st.rerun()
 
 elif st.session_state.pagina == "visualizar":
-    # --- TELA INTEIRA DE LEITURA COMPLETA ---
+    # --- TELA INTRÍNSECA DE LEITURA TOTAL ---
     nota_atual = st.session_state.nota_visualizar
-    idx_nota_db = st.session_state.nota_visualizar_index
     eixo_display = nota_atual.get('eixo', 'Clínica')
     sub_display = f" | {nota_atual.get('subeixo')}" if nota_atual.get('subeixo') else ""
     cor_tag = CORES_EIXOS.get(eixo_display, "#718096")
@@ -316,60 +292,8 @@ elif st.session_state.pagina == "visualizar":
     st.markdown(tag_html, unsafe_allow_html=True)
     st.markdown("---")
     
-    # --- PALETA DE MARCA-TEXTO ULTRA MINIMALISTA ---
-    cols_cores = st.columns(7)
-    lista_cores = list(MAPA_CORES_MARCADOR.keys())
-    
-    for i, nome_cor in enumerate(lista_cores):
-        with cols_cores[i]:
-            # Ativa destaque visual (cor escura) apenas no botão que está atualmente selecionado
-            tipo_botao = "primary" if st.session_state.cor_marcador_atual == nome_cor else "secondary"
-            if st.button(nome_cor, key=f"btn_m_{nome_cor}", type=tipo_botao, use_container_width=True):
-                st.session_state.cor_marcador_atual = nome_cor
-                st.rerun()
-                
-    # Input inline sem título (label_visibility='collapsed') para colar e dar Enter
-    col_input, col_clear = st.columns([5, 1.2])
-    with col_input:
-        texto_selecionado = st.text_input(
-            "", 
-            placeholder="Selecione e copie o texto acima, cole-o aqui e aperte Enter para grifar", 
-            key="input_marcador_invisivel", 
-            label_visibility="collapsed"
-        )
-    with col_clear:
-        if st.button("Limpar Grifos", key="btn_limpar_grifos", use_container_width=True):
-            notas_db = carregar_notas()
-            if idx_nota_db is not None and idx_nota_db < len(notas_db):
-                notas_db[idx_nota_db]["destaques"] = []
-                with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
-                    json.dump(notas_db, f, ensure_ascii=False, indent=4)
-                st.session_state.nota_visualizar = notas_db[idx_nota_db]
-                st.rerun()
-
-    # Fluxo disparado ao apertar Enter no input
-    if texto_selecionado:
-        notas_db = carregar_notas()
-        if idx_nota_db is not None and idx_nota_db < len(notas_db):
-            if "destaques" not in os.environ and "destaques" not in notas_db[idx_nota_db]:
-                notas_db[idx_nota_db]["destaques"] = []
-            
-            hex_marcador = MAPA_CORES_MARCADOR[st.session_state.cor_marcador_atual]
-            notas_db[idx_nota_db]["destaques"].append({
-                "termo": texto_selecionado,
-                "cor": hex_marcador
-            })
-            
-            with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
-                json.dump(notas_db, f, ensure_ascii=False, indent=4)
-                
-            st.session_state.nota_visualizar = notas_db[idx_nota_db]
-            st.rerun()
-            
-    st.markdown("---")
-    
-    # Exibe a nota carregando a lista completa de grifos permanentes salvos no JSON
-    conteudo_renderizado = formatar_texto_customizado(nota_atual['conteudo'], nota_atual.get("destaques", []))
+    # Executa a renderização puramente textual
+    conteudo_renderizado = formatar_texto_customizado(nota_atual['conteudo'])
     st.markdown(conteudo_renderizado, unsafe_allow_html=True)
     st.markdown("---")
     
@@ -406,7 +330,6 @@ elif st.session_state.pagina == "editor":
                     "eixo": st.session_state.eixo_selecionado,
                     "subeixo": st.session_state.subeixo_selecionado,
                     "conteudo": conteudo_nota,
-                    "destaques": nota_atual.get("destaques", []) if st.session_state.modo_editor == "editar" and 'nota_atual' in locals() else [],
                     "data": str(date.today())
                 }
                 
@@ -416,8 +339,6 @@ elif st.session_state.pagina == "editor":
                 else:
                     idx_alvo = st.session_state.nota_index
                     if idx_alvo is not None and idx_alvo < len(notas):
-                        # Mantém os destaques antigos salvos se estiver editando textualmente
-                        nova_nota["destaques"] = notas[idx_alvo].get("destaques", [])
                         notas[idx_alvo] = nova_nota
                         
                 with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
