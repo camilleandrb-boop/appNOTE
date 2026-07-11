@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import re
 from datetime import date
 
 # Nomes dos nossos arquivos locais
@@ -55,6 +56,61 @@ if "edit_conteudo" not in st.session_state:
     st.session_state.edit_conteudo = ""
 if "nota_index" not in st.session_state:
     st.session_state.nota_index = None
+
+# --- MOTOR DE FORMATAÇÃO CUSTOMIZADA (SOLUÇÃO DEFINITIVA) ---
+def formatar_texto_customizado(texto):
+    if not texto:
+        return ""
+    
+    linhas = texto.split("\n")
+    linhas_formatadas = []
+    
+    for linha in linhas:
+        linha_clean = linha.strip()
+        
+        # 1. Subtítulos (Linha começando com #)
+        if linha_clean.startswith("#"):
+            conteudo = re.sub(r'^#\s*', '', linha)
+            linhas_formatadas.append(f"<h4 style='margin-top: 14px; margin-bottom: 6px; color: #1A202C; font-weight: 700;'>{conteudo}</h4>")
+        
+        # 2. Citações (Linha começando com “)
+        elif linha_clean.startswith("“") or linha_clean.startswith('"'):
+            conteudo = re.sub(r'^[“"]\s*', '', linha)
+            linhas_formatadas.append(f"<blockquote style='border-left: 4px solid #CBD5E0; padding-left: 12px; color: #4A5568; font-style: italic; margin: 8px 0; background-color: #F7FAFC; padding-top: 4px; padding-bottom: 4px;'>{conteudo}</blockquote>")
+        
+        else:
+            # 3. Processamento de Cores (Suporta Inglês e Português perfeitamente)
+            padrao_cor = r':(red|vermelho|blue|azul|green|verde|orange|laranja|violet|roxo)\[(.*?)\]'
+            def substituir_cor(match):
+                cor_nome = match.group(1).lower()
+                conteudo_cor = match.group(2)
+                mapa_cores = {
+                    "red": "#E53E3E", "vermelho": "#E53E3E",
+                    "blue": "#1976D2", "azul": "#1976D2",
+                    "green": "#38A169", "verde": "#38A169",
+                    "orange": "#E65100", "laranja": "#E65100",
+                    "violet": "#7B1FA2", "roxo": "#7B1FA2"
+                }
+                return f"<span style='color: {mapa_cores.get(cor_nome, '#2D3748')}; font-weight: 600;'>{conteudo_cor}</span>"
+            
+            linha = re.sub(padrao_cor, substituir_cor, linha, flags=re.IGNORECASE)
+            
+            # 4. Negrito (*)
+            linha = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', linha)
+            
+            # 5. Itálico (_)
+            linha = re.sub(r'_(.*?)_', r'<em>\1</em>', linha)
+            
+            # 6. Sublinhado (=)
+            linha = re.sub(r'=(.*?)=', r'<u>\1</u>', linha)
+            
+            # Gerenciamento de linhas em branco para espaçamento correto
+            if not linha_clean:
+                linhas_formatadas.append("<div style='height: 10px;'></div>")
+            else:
+                linhas_formatadas.append(f"<p style='margin: 4px 0; line-height: 1.5; color: #2D3748;'>{linha}</p>")
+                
+    return "".join(linhas_formatadas)
 
 # --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
@@ -114,8 +170,10 @@ def dialog_ver_nota(nota, cor_tag, eixo, subeixo):
     st.markdown(tag_html, unsafe_allow_html=True)
     st.subheader(nota['titulo'])
     st.markdown("---")
-    # Alterado para st.markdown para renderizar cores, negritos e listas com precisão total
-    st.markdown(nota['conteudo'])
+    
+    # Executa o motor de formatação customizado com suporte a HTML
+    conteudo_renderizado = formatar_texto_customizado(nota['conteudo'])
+    st.markdown(conteudo_renderizado, unsafe_allow_html=True)
     st.write("")
 
 # --- POP-UP DE NOVA NOTA (SELEÇÃO DE ÁREA) ---
@@ -156,14 +214,14 @@ with st.sidebar:
     st.markdown("---")
     
     st.write("**Gerenciar Notas**")
-    notas_painel = carregar_notas()
-    if notas_painel:
+    notes_painel = carregar_notas()
+    if notes_painel:
         busca_gerenciar = st.text_input("🔍 Filtrar nota para exclusão", key="busca_gerenciar_nota")
         
         opcoes_remover_notas = []
         mapeamento_indices = {}
         
-        for idx_real, n in enumerate(notas_painel):
+        for idx_real, n in enumerate(notes_painel):
             eixo_n = n.get('eixo', 'Clínica')
             sub_n = f" | {n.get('subeixo')}" if n.get('subeixo') else ""
             label_nota = f"{eixo_n}{sub_n} - {n['titulo']}"
@@ -178,9 +236,9 @@ with st.sidebar:
         if st.button("Excluir Nota", key="btn_rem_nota_sidebar", use_container_width=True):
             if nota_alvo_remover and nota_alvo_remover in mapeamento_indices:
                 idx_remover = mapeamento_indices[nota_alvo_remover]
-                notas_painel.pop(idx_remover)
+                notes_painel.pop(idx_remover)
                 with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
-                    json.dump(notas_painel, f, ensure_ascii=False, indent=4)
+                    json.dump(notes_painel, f, ensure_ascii=False, indent=4)
                 st.success("Nota excluída!")
                 st.rerun()
     else:
@@ -191,7 +249,6 @@ with st.sidebar:
 # ==========================================
 
 if st.session_state.pagina == "home":
-    # --- TELA INICIAL ---
     st.title("🏥 Medicina")
     
     if st.button("Nova Nota", type="primary", use_container_width=True, key="btn_nova_nota_main"):
@@ -202,7 +259,6 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Filtros
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar", key="busca_principal")
@@ -242,7 +298,6 @@ if st.session_state.pagina == "home":
         else:
             st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
-            # --- GALERIA EM GRID ---
             num_colunas = 2
             cols = st.columns(num_colunas)
             
@@ -290,7 +345,6 @@ if st.session_state.pagina == "home":
                                 st.rerun()
 
 elif st.session_state.pagina == "editor":
-    # --- TELA CHEIA DE EDIÇÃO/CRIAÇÃO CLEAN ---
     sub_titulo = f" 🔸 {st.session_state.subeixo_selecionado}" if st.session_state.subeixo_selecionado else ""
     
     if st.session_state.modo_editor == "editar":
@@ -301,18 +355,17 @@ elif st.session_state.pagina == "editor":
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
     conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=380, key="editor_conteudo")
     
-    # --- GUIA DE FORMATAÇÃO DO TEXTO (EXPANDÍVEL) ---
-    with st.expander("💡 Guia de Formatação Rápida (Toque para ver os comandos)"):
+    # --- ATUALIZADO: GUIA DE FORMATAÇÃO DO TEXTO CUSTOMIZADO ---
+    with st.expander("💡 Guia de Formatação Rápida (Toque para ver os novos comandos)"):
         st.markdown("""
         Você pode estilizar suas anotações digitando estes comandos simples direto no texto:
-        * **Negrito:** Use dois asteriscos. Ex: `**hipertensão**` vira **hipertensão**.
-        * *Itálico:* Use um asterisco. Ex: `*Staphylococcus*` vira *Staphylococcus*.
-        * **Tópicos/Listas:** Digite um hífen seguido de espaço no início da linha. Ex: `- Sintomas`
-        * **Caixas de Observação (Citação):** Use o sinal de maior no início da linha. Ex: `> Paciente alérgico à Penicilina.`
-        * **Linha Divisória:** Digite três hifens sozinhos em uma linha `---` para criar uma linha de separação.
-        * **Texto Colorido:** Use o padrão `:cor[seu texto]`. 
-          * Cores médicas úteis: `:red[Vermelho]` para alertas, `:blue[Azul]` para condutas, `:green[Verde]` para altas/estabilidade.
-          * Outras cores: `:orange[Laranja]`, `:violet[Roxo]`.
+        * *Negrito:* Use apenas um asterisco simples em cada ponta. Ex: `*hipertensão*` vira **hipertensão**.
+        * _Itálico:_ Use um sublinhado/underline. Ex: `_Staphylococcus_` vira *Staphylococcus*.
+        * # Subtítulos: Digite a hashtag seguida de um espaço no início da linha. Ex: `# Conduta`
+        * =Sublinhar=: Use o sinal de igual em cada ponta. Ex: `=checar exames=` vira <u>checar exames</u>.
+        * “ Citação: Digite as aspas normais no início de uma linha para criar um bloco cinza. Ex: `“ Paciente relata dor crônica...`
+        * **Texto Colorido Correto (Suporta Português!):** Use o padrão `:cor[seu texto]`. 
+          * Exemplos: `:vermelho[Alerta Máximo]`, `:azul[Ajuste de Dose]`, `:verde[Paciente Estável]`, `:roxo[Genética]`, `:laranja[Cirúrgico]`.
         """)
     
     col_salvar, col_cancelar = st.columns(2)
