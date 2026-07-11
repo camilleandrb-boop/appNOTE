@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import html
 from datetime import date
 
 # Nomes dos nossos arquivos locais
@@ -15,7 +16,7 @@ CORES_EIXOS = {
     "Preventiva": "#D49A00",                  # Amarelo Escuro / Ouro
     "Pediatria": "#7B1FA2",                   # Roxo
     "Ginecologia e Obstetrícia": "#C2185B",   # Rosa Escuro / Magenta
-    "Clínica": "#1976D2",                      # Azul Médico
+    "Clínica": "#1976D2",                     # Azul Médico
     "Cirurgia": "#E65100"                     # Laranja
 }
 
@@ -155,7 +156,11 @@ if st.session_state.pagina == "home":
                 # Pega a cor correspondente da etiqueta
                 cor_tag = CORES_EIXOS.get(eixo_display, "#718096")
                 
-                # Monta o quadrado em HTML branco com a tag colorida embaixo
+                # Sanitização para evitar quebra de HTML se o usuário digitar '<', '>', etc.
+                titulo_seguro = html.escape(nota['titulo'])
+                conteudo_seguro = html.escape(nota['conteudo'])
+                
+                # Monta o quadrado em HTML (ajustado com Flexbox para empurrar a tag para baixo)
                 card_html = f"""
                 <div style="
                     background-color: #FFFFFF;
@@ -164,16 +169,19 @@ if st.session_state.pagina == "home":
                     margin-bottom: 16px;
                     box-shadow: 0 4px 10px rgba(0,0,0,0.04);
                     border: 1px solid #E2E8F0;
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
                 ">
                     <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; color: #1A202C;">
-                        {nota['titulo']}
+                        {titulo_seguro}
                     </div>
                     
-                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #4A5568; margin-bottom: 18px;">
-                        {nota['conteudo']}
+                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #4A5568; margin-bottom: 18px; flex-grow: 1;">
+                        {conteudo_seguro}
                     </div>
                     
-                    # Etiqueta do Eixo (Letra branca e fundo colorido na parte de baixo)
+                    <!-- Etiqueta do Eixo na parte de baixo -->
                     <div style="margin-top: auto;">
                         <span style="
                             background-color: {cor_tag};
