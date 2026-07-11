@@ -10,10 +10,18 @@ ARQUIVO_SUBEIXOS = "subeixos.json"
 # As 5 grandes áreas são fixas
 EIXOS_FIXOS = ["Cirurgia", "Clínica", "Ginecologia e Obstetrícia", "Pediatria", "Preventiva"]
 
-# --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
-st.set_page_config(page_title="Medicina", page_icon="🏥")
+# Mapeamento de cores suaves (pastéis) para o fundo de cada eixo
+CORES_EIXOS = {
+    "Preventiva": "#FFF9C4",                  # Amarelo claro
+    "Pediatria": "#F3E5F5",                   # Roxo claro
+    "Ginecologia e Obstetrícia": "#FCE4EC",   # Rosa claro
+    "Clínica": "#E3F2FD",                      # Azul claro
+    "Cirurgia": "#FFE0B2"                     # Laranja claro
+}
 
-# Controle de navegação e seleções temporárias
+# --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
+st.set_page_config(page_title="Medicina", page_icon="🏥", layout="wide") # 'wide' ajuda na disposição da galeria
+
 if "pagina" not in st.session_state:
     st.session_state.pagina = "home"
 if "eixo_selecionado" not in st.session_state:
@@ -35,12 +43,10 @@ def salvar_nota(nova_nota):
         json.dump(notas, f, ensure_ascii=False, indent=4)
 
 def carregar_subeixos():
-    # Cria a estrutura zerada para os eixos fixos
     estrutura_base = {eixo: [] for eixo in EIXOS_FIXOS}
     if os.path.exists(ARQUIVO_SUBEIXOS):
         with open(ARQUIVO_SUBEIXOS, "r", encoding="utf-8") as f:
             dados_salvos = json.load(f)
-            # Mescla os dados salvos com a estrutura base (garante que os 5 eixos existam)
             for eixo in EIXOS_FIXOS:
                 if eixo in dados_salvos:
                     estrutura_base[eixo] = dados_salvos[eixo]
@@ -56,8 +62,6 @@ subeixos_db = carregar_subeixos()
 @st.dialog("Nova Anotação")
 def popup_selecionar_materia():
     eixo_escolhido = st.selectbox("Selecione o Eixo Principal", EIXOS_FIXOS)
-    
-    # Carrega os subeixos disponíveis para o eixo selecionado
     opcoes_subeixo = ["Nenhum"] + subeixos_db[eixo_escolhido]
     subeixo_escolhido = st.selectbox("Subeixo (Opcional)", opcoes_subeixo)
     
@@ -67,13 +71,12 @@ def popup_selecionar_materia():
         st.session_state.pagina = "editor"
         st.rerun()
 
-# --- MENU LATERAL (APENAS CONFIGURAÇÕES DE SUBEIXOS) ---
+# --- MENU LATERAL (CONFIGURAÇÕES DE SUBEIXOS) ---
 with st.sidebar:
     st.header("⚙️ Configurações")
     st.write("**Gerenciar Subeixos**")
     
     eixo_alvo = st.selectbox("Qual eixo deseja editar?", EIXOS_FIXOS)
-    
     nova_tag = st.text_input(f"Novo Subeixo para {eixo_alvo}")
     if st.button("Adicionar Subeixo"):
         if nova_tag and nova_tag not in subeixos_db[eixo_alvo]:
@@ -104,7 +107,7 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Barra de busca e filtros dinâmicos
+    # Barra de busca e filtros
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar")
@@ -125,13 +128,11 @@ if st.session_state.pagina == "home":
     else:
         notas_filtradas = []
         for nota in notas_salvas:
-            # Lógica de compatibilidade com notas antigas
             eixo_da_nota = nota.get("eixo", nota.get("materia", ""))
             subeixo_da_nota = nota.get("subeixo", "")
             
             bate_eixo = (filtro_eixo == "Todos" or eixo_da_nota == filtro_eixo)
             bate_sub = (filtro_sub == "Todos" or subeixo_da_nota == filtro_sub)
-            
             termo = busca.lower()
             bate_busca = (termo in nota["titulo"].lower() or termo in nota["conteudo"].lower())
             
@@ -140,14 +141,47 @@ if st.session_state.pagina == "home":
 
         if not notas_filtradas:
             st.warning("Nenhuma nota encontrada com estes filtros.")
+        else:
+            st.write(f"**Anotações encontradas:** {len(notas_filtradas)}")
             
-        for nota in reversed(notas_filtradas):
-            # Formata o cabeçalho dinamicamente
-            eixo_display = nota.get('eixo', nota.get('materia', 'Sem eixo'))
-            sub_display = f" 🔸 {nota.get('subeixo')}" if nota.get('subeixo') else ""
+            # --- SISTEMA DE GALERIA (GRID) ---
+            # Define o número de colunas na galeria (2 colunas fica excelente em iPads e iPhones)
+            num_colunas = 2
+            cols = st.columns(num_colunas)
             
-            with st.expander(f"{nota['data']} | {eixo_display}{sub_display} - {nota['titulo']}"):
-                st.write(nota['conteudo'])
+            for idx, nota in enumerate(reversed(notas_filtradas)):
+                eixo_display = nota.get('eixo', nota.get('materia', 'Clínica'))
+                sub_display = f" | {nota.get('subeixo')}" if nota.get('subeixo') else ""
+                
+                # Pega a cor correspondente ou usa cinza claro se não encontrar
+                cor_fundo = CORES_EIXOS.get(eixo_display, "#F5F5F5")
+                
+                # Monta a caixinha em HTML com cantos arredondados e cor customizada
+                card_html = f"""
+                <div style="
+                    background-color: {cor_fundo};
+                    padding: 18px;
+                    border-radius: 14px;
+                    margin-bottom: 16px;
+                    color: #2D3748;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+                    border: 1px solid rgba(0,0,0,0.05);
+                ">
+                    <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 6px;">
+                        📅 {nota['data']} - {eixo_display.upper()}{sub_display.upper()}
+                    </div>
+                    <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; color: #1A202C;">
+                        {nota['titulo']}
+                    </div>
+                    <div style="font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; color: #2D3748;">
+                        {nota['conteudo']}
+                    </div>
+                </div>
+                """
+                
+                # Distribui os cards entre as colunas criadas
+                with cols[idx % num_colunas]:
+                    st.markdown(card_html, unsafe_allow_html=True)
 
 elif st.session_state.pagina == "editor":
     # --- TELA CHEIA DE EDIÇÃO ---
