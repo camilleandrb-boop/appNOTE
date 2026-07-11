@@ -114,7 +114,8 @@ def dialog_ver_nota(nota, cor_tag, eixo, subeixo):
     st.markdown(tag_html, unsafe_allow_html=True)
     st.subheader(nota['titulo'])
     st.markdown("---")
-    st.write(nota['conteudo'])
+    # Alterado para st.markdown para renderizar cores, negritos e listas com precisão total
+    st.markdown(nota['conteudo'])
     st.write("")
 
 # --- POP-UP DE NOVA NOTA (SELEÇÃO DE ÁREA) ---
@@ -134,7 +135,6 @@ def popup_selecionar_materia():
 with st.sidebar:
     st.header("⚙️ Configurações")
     
-    # 1. Seção: Gerenciar Subeixos
     st.write("**Gerenciar Subeixos**")
     eixo_alvo = st.selectbox("Selecione o eixo principal", EIXOS_FIXOS, key="config_eixo_alvo")
     nova_tag = st.text_input(f"Novo subeixo para {eixo_alvo}", key="config_nova_tag")
@@ -155,22 +155,19 @@ with st.sidebar:
             
     st.markdown("---")
     
-    # 2. Seção: Gerenciar Notas (Com filtro de busca integrado)
     st.write("**Gerenciar Notas**")
     notas_painel = carregar_notas()
     if notas_painel:
-        # Nova barra de busca interna para exclusão
         busca_gerenciar = st.text_input("🔍 Filtrar nota para exclusão", key="busca_gerenciar_nota")
         
         opcoes_remover_notas = []
-        mapeamento_indices = {} # Mapeia a string exibida de volta para o índice real do arquivo json
+        mapeamento_indices = {}
         
         for idx_real, n in enumerate(notas_painel):
             eixo_n = n.get('eixo', 'Clínica')
             sub_n = f" | {n.get('subeixo')}" if n.get('subeixo') else ""
             label_nota = f"{eixo_n}{sub_n} - {n['titulo']}"
             
-            # Filtra se o usuário digitou algo na busca (olha no título, eixo ou conteúdo interno)
             termo_busca = busca_gerenciar.lower()
             if not busca_gerenciar or (termo_busca in label_nota.lower() or termo_busca in n['conteudo'].lower()):
                 opcoes_remover_notas.append(label_nota)
@@ -205,7 +202,7 @@ if st.session_state.pagina == "home":
         
     st.markdown("---")
     
-    # Filtros da Galeria Principal
+    # Filtros
     col1, col2, col3 = st.columns(3)
     with col1:
         busca = st.text_input("🔍 Buscar", key="busca_principal")
@@ -302,7 +299,21 @@ elif st.session_state.pagina == "editor":
         st.title(f"📁 Nova Nota: {st.session_state.eixo_selecionado}{sub_titulo}")
     
     titulo_nota = st.text_input("Título do Caso ou Aula", value=st.session_state.edit_titulo, key="editor_titulo")
-    conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=400, key="editor_conteudo")
+    conteudo_nota = st.text_area("Suas anotações...", value=st.session_state.edit_conteudo, height=380, key="editor_conteudo")
+    
+    # --- GUIA DE FORMATAÇÃO DO TEXTO (EXPANDÍVEL) ---
+    with st.expander("💡 Guia de Formatação Rápida (Toque para ver os comandos)"):
+        st.markdown("""
+        Você pode estilizar suas anotações digitando estes comandos simples direto no texto:
+        * **Negrito:** Use dois asteriscos. Ex: `**hipertensão**` vira **hipertensão**.
+        * *Itálico:* Use um asterisco. Ex: `*Staphylococcus*` vira *Staphylococcus*.
+        * **Tópicos/Listas:** Digite um hífen seguido de espaço no início da linha. Ex: `- Sintomas`
+        * **Caixas de Observação (Citação):** Use o sinal de maior no início da linha. Ex: `> Paciente alérgico à Penicilina.`
+        * **Linha Divisória:** Digite três hifens sozinhos em uma linha `---` para criar uma linha de separação.
+        * **Texto Colorido:** Use o padrão `:cor[seu texto]`. 
+          * Cores médicas úteis: `:red[Vermelho]` para alertas, `:blue[Azul]` para condutas, `:green[Verde]` para altas/estabilidade.
+          * Outras cores: `:orange[Laranja]`, `:violet[Roxo]`.
+        """)
     
     col_salvar, col_cancelar = st.columns(2)
     
