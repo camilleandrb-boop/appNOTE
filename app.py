@@ -3,11 +3,20 @@ import json
 import os
 from datetime import date
 
-# Nomes dos nossos arquivos de banco de dados locais
+# Nomes dos nossos arquivos locais
 ARQUIVO_NOTAS = "notas.json"
 ARQUIVO_MATERIAS = "materias.json"
 
-# --- FUNÇÕES DE PERSISTÊNCIA (NOTAS) ---
+# --- CONFIGURAÇÃO INICIAL DA PÁGINA E ESTADO ---
+st.set_page_config(page_title="Medicina", page_icon="🏥")
+
+# Criamos variáveis de "estado" para o app lembrar onde estamos
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "home"
+if "materia_selecionada" not in st.session_state:
+    st.session_state.materia_selecionada = ""
+
+# --- FUNÇÕES DE PERSISTÊNCIA ---
 def carregar_notas():
     if os.path.exists(ARQUIVO_NOTAS):
         with open(ARQUIVO_NOTAS, "r", encoding="utf-8") as f:
@@ -20,111 +29,118 @@ def salvar_nota(nova_nota):
     with open(ARQUIVO_NOTAS, "w", encoding="utf-8") as f:
         json.dump(notas, f, ensure_ascii=False, indent=4)
 
-# --- FUNÇÕES DE PERSISTÊNCIA (MATÉRIAS/EIXOS) ---
 def carregar_materias():
     if os.path.exists(ARQUIVO_MATERIAS):
         with open(ARQUIVO_MATERIAS, "r", encoding="utf-8") as f:
             lista = json.load(f)
-            if lista: # Se não estiver vazia, retorna a lista salva
-                return lista
-    # Lista padrão caso o arquivo ainda não exista ou esteja vazio
+            if lista: return lista
     return ["Pediatria", "Genética", "Clínica Médica", "Ginecologia e Obstetrícia", "Cirurgia Geral"]
 
 def salvar_materias(nova_lista):
     with open(ARQUIVO_MATERIAS, "w", encoding="utf-8") as f:
         json.dump(nova_lista, f, ensure_ascii=False, indent=4)
 
-# Configuração da página
-st.set_page_config(page_title="Minhas Anotações", page_icon="📝")
-st.title("📝 Anotações do Internato")
-
-# Carrega as matérias dinâmicas do arquivo
 materias_disponiveis = carregar_materias()
 
-# --- MENU LATERAL ---
-st.sidebar.header("Nova Anotação")
-titulo = st.sidebar.text_input("Título ou Tema")
-
-# O selectbox agora usa a nossa lista dinâmica!
-materia = st.sidebar.selectbox("Eixo/Matéria", materias_disponiveis)
-
-conteudo = st.sidebar.text_area("Conteúdo da anotação")
-data_atual = st.sidebar.date_input("Data", date.today())
-
-# Lógica do Botão de Salvar Nota
-if st.sidebar.button("Salvar Nota"):
-    if titulo and conteudo:
-        nova_nota = {
-            "titulo": titulo,
-            "materia": materia,
-            "conteudo": conteudo,
-            "data": str(data_atual)
-        }
-        salvar_nota(nova_nota)
-        st.sidebar.success("Nota salva com sucesso!")
-        st.rerun() # Atualiza a tela para mostrar a nota imediatamente
-    else:
-        st.sidebar.warning("Preencha o título e o conteúdo antes de salvar.")
-
-st.sidebar.markdown("---") # Linha divisória no menu
-
-# --- SEÇÃO DE GERENCIAR MATÉRIAS ---
-st.sidebar.header("⚙️ Gerenciar Matérias")
-nova_materia = st.sidebar.text_input("Nova Matéria/Eixo")
-
-if st.sidebar.button("Adicionar Matéria"):
-    if nova_materia:
-        if nova_materia not in materias_disponiveis:
-            materias_disponiveis.append(nova_materia)
-            salvar_materias(materias_disponiveis)
-            st.sidebar.success(f"'{nova_materia}' adicionada!")
-            st.rerun() # Atualiza a tela para atualizar o selectbox acima
-        else:
-            st.sidebar.warning("Esta matéria já existe!")
-    else:
-        st.sidebar.warning("Digite o nome da matéria.")
-
-# Opção para excluir uma matéria se necessário
-st.sidebar.markdown("**Remover Matéria:**")
-materia_para_remover = st.sidebar.selectbox("Selecionar para remover", [""] + materias_disponiveis)
-if st.sidebar.button("Remover"):
-    if materia_para_remover:
-        materias_disponiveis.remove(materia_para_remover)
-        salvar_materias(materias_disponiveis)
-        st.sidebar.success(f"'{materia_para_remover}' removida!")
+# --- POP-UP DE NOVA NOTA ---
+@st.dialog("Nova Anotação")
+def popup_selecionar_materia():
+    st.write("Em qual eixo você vai anotar agora?")
+    materia_escolhida = st.selectbox("Eixo/Matéria", materias_disponiveis, label_visibility="collapsed")
+    
+    if st.button("Continuar para o editor ➡️", use_container_width=True):
+        # Salva a escolha e muda a página
+        st.session_state.materia_selecionada = materia_escolhida
+        st.session_state.pagina = "editor"
         st.rerun()
 
-# --- ÁREA PRINCIPAL ---
-st.subheader("Anotações Salvas")
+# --- MENU LATERAL (APENAS CONFIGURAÇÕES) ---
+with st.sidebar:
+    st.header("⚙️ Configurações")
+    st.write("Gerenciar Eixos/Matérias")
+    nova_materia = st.text_input("Nova Matéria")
+    if st.button("Adicionar"):
+        if nova_materia and nova_materia not in materias_disponiveis:
+            materias_disponiveis.append(nova_materia)
+            salvar_materias(materias_disponiveis)
+            st.success("Adicionada!")
+            st.rerun()
+            
+    materia_para_remover = st.selectbox("Remover Matéria", [""] + materias_disponiveis)
+    if st.button("Remover"):
+        if materia_para_remover:
+            materias_disponiveis.remove(materia_para_remover)
+            salvar_materias(materias_disponiveis)
+            st.success("Removida!")
+            st.rerun()
 
-# Adicionando uma barra de busca simples e filtro por matéria na área principal
-col1, col2 = st.columns(2)
-with col1:
-    busca = st.text_input("🔍 Buscar por palavra-chave")
-with col2:
-    filtro_materia = st.selectbox("📁 Filtrar por Matéria", ["Todas"] + materias_disponiveis)
+# ==========================================
+# ROTEAMENTO DE TELAS
+# ==========================================
 
-notas_salvas = carregar_notas()
-
-if not notas_salvas:
-    st.info("Nenhuma anotação salva ainda. Use o menu lateral para adicionar a primeira!")
-else:
-    # Filtra as notas com base na busca e no filtro de matéria
-    notas_filtradas = []
-    for nota in notas_salvas:
-        # Verifica se bate com o filtro de matéria
-        bate_materia = (filtro_materia == "Todas" or nota["materia"] == filtro_materia)
-        # Verifica se bate com a palavra-chave no título ou conteúdo
-        termo = busca.lower()
-        bate_busca = (termo in nota["titulo"].lower() or termo in nota["conteudo"].lower())
+if st.session_state.pagina == "home":
+    # --- TELA INICIAL ---
+    st.title("🏥 Medicina")
+    
+    # Botão de destaque na tela principal
+    if st.button("➕ Nova Nota", type="primary", use_container_width=True):
+        popup_selecionar_materia()
         
-        if bate_materia and bate_busca:
-            notas_filtradas.append(nota)
+    st.markdown("---")
+    
+    # Barra de busca e listagem
+    col1, col2 = st.columns(2)
+    with col1:
+        busca = st.text_input("🔍 Buscar anotação")
+    with col2:
+        filtro_materia = st.selectbox("📁 Filtrar eixo", ["Todos"] + materias_disponiveis)
 
-    if not notas_filtradas:
-        st.warning("Nenhuma nota encontrada com esses filtros.")
+    notas_salvas = carregar_notas()
+    
+    if not notas_salvas:
+        st.info("Sua base está vazia. Clique em Nova Nota para começar.")
     else:
-        # Mostra as notas filtradas da mais recente para a mais antiga
+        notas_filtradas = []
+        for nota in notas_salvas:
+            bate_materia = (filtro_materia == "Todos" or nota["materia"] == filtro_materia)
+            termo = busca.lower()
+            bate_busca = (termo in nota["titulo"].lower() or termo in nota["conteudo"].lower())
+            if bate_materia and bate_busca:
+                notas_filtradas.append(nota)
+
         for nota in reversed(notas_filtradas):
-            with st.expander(f"{nota['data']} - {nota['materia']}: {nota['titulo']}"):
+            with st.expander(f"{nota['data']} | {nota['materia']} - {nota['titulo']}"):
                 st.write(nota['conteudo'])
+
+elif st.session_state.pagina == "editor":
+    # --- TELA CHEIA DE EDIÇÃO ---
+    st.title(f"📁 {st.session_state.materia_selecionada}")
+    
+    titulo_nota = st.text_input("Título do Caso ou Aula")
+    conteudo_nota = st.text_area("Suas anotações...", height=400) # Deixa a caixa de texto bem grande
+    
+    col_salvar, col_cancelar = st.columns(2)
+    
+    with col_salvar:
+        if st.button("💾 Salvar Anotação", type="primary", use_container_width=True):
+            if titulo_nota and conteudo_nota:
+                nova_nota = {
+                    "titulo": titulo_nota,
+                    "materia": st.session_state.materia_selecionada,
+                    "conteudo": conteudo_nota,
+                    "data": str(date.today())
+                }
+                salvar_nota(nova_nota)
+                # Limpa o estado e volta pra home
+                st.session_state.pagina = "home"
+                st.session_state.materia_selecionada = ""
+                st.rerun()
+            else:
+                st.warning("Preencha título e conteúdo.")
+                
+    with col_cancelar:
+        if st.button("❌ Cancelar", use_container_width=True):
+            # Abandona a edição e volta pra home
+            st.session_state.pagina = "home"
+            st.session_state.materia_selecionada = ""
+            st.rerun()
